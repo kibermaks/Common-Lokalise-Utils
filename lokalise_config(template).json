@@ -1,0 +1,9 @@
+{
+	"localization_path": "../app/src/main/res",
+	"localization_settings_path": "",
+	"setting_plist_keys": ["Title", "DefaultValue", "ValuePlaceholder", "SubTitle", "ValueTitles"],
+	"lokalise_token": "df656aa45ce1a40b6d819f66de2cfc8dc462349b",
+	"lokalise_project_id": "406175415bab962ee30ef3.85635678",
+	"project_name": "hp",
+	"platform": "android"
+}

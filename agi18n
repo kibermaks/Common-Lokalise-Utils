@@ -1,0 +1,109 @@
+#!/usr/bin/env ruby
+
+def get_regex(pattern, encoding='ASCII', options=0)
+  Regexp.new(pattern.encode(encoding),options)
+end
+
+require 'tmpdir'
+
+
+COMMENTS_REGEXP = get_regex('/\*(?<text>.*)\*/', 'UTF-16LE')
+LABEL_REGEXP = get_regex('^"(?<text>.*)" = ".*";$', 'UTF-16LE')
+
+#### PARSE PARAMETERS ####
+input_path  = ""
+output_path = ""
+loop { 
+	if ARGV[0] == '-i' then ARGV.shift; input_path = ARGV.shift
+	elsif ARGV[0] == '-o' then ARGV.shift; output_path = ARGV.shift
+	else break end
+}
+
+def remove_duplicates(file)
+	puts "Removing duplicates from #{file}"	
+
+	
+	labels = Hash.new
+	comment = ""
+
+	# Parse all the labels from the xib
+	File.open(file, 'rb:bom|UTF-16LE').each do |line|
+		# Read comments
+		md = COMMENTS_REGEXP.match(line)  
+		if md  then
+			comment = md.captures.first
+		end
+
+		# Read label
+		md = LABEL_REGEXP.match(line)  
+		if md  then
+			key = md.captures			
+			if labels[key].nil? then
+				labels[key] = Hash.new() 
+				labels[key][:comment] = comment
+				labels[key][:line] = line			
+			end
+			comment = ""
+		end
+	end  
+
+	File.open(file, 'wb:UTF-16LE') do |file|	
+    file.puts "\uFEFF"
+    
+		labels.keys.sort.each do |key|
+			str = key.first
+			comment = labels[key][:comment]
+			line = labels[key][:line]
+			file.puts "\n/*".encode('UTF-16LE') + comment + "*/".encode('UTF-16LE')				
+			file.puts line
+		end
+	end
+
+end
+
+puts "\nInternazionalizing en.lproj..."
+
+#Execute genstrings appending results
+puts "Executing `genstrings -a -o #{output_path} **/*.{h,m,mm,swift}`"	
+source_files = Dir["#{input_path}/**/*.{h,m,mm,swift}"]
+`genstrings -a -littleEndian -o #{output_path} "#{source_files.join('" "')}"`
+
+puts "Executing `genxibstring -a -o #{output_path} **/*.{h,m,mm,swift}`"
+labels = Hash.new
+LABEL_REGEXP_XIB = get_regex('^".*" = "(?<text>.*)";$', 'UTF-16LE')
+
+Dir["#{input_path}/**/*.{xib,nib,storyboard}"].each do |file|
+	name = File.basename(file)
+	temp_file = File.join(Dir.tmpdir, name + ".strings")
+
+	# Extract labels
+	`ibtool --export-strings-file "#{temp_file}" "#{file}"`
+
+	if File.exists?(temp_file)  then
+		# Parse all the labels from the xib
+		File.open(temp_file, 'rb:UTF-16LE').each do |line|
+			md = LABEL_REGEXP_XIB.match(line)  
+			if md  then
+				key = md.captures			
+				labels[key] = Array.new() if labels[key].nil?
+				labels[key].push(name)
+			end
+		end
+	end  	
+end
+
+#### FORMAT LABELS  IN LOCALIZABLE.STRINGS FORMAT ####
+output = File.join(output_path, 'Localizable.strings')
+File.open(output, ('a') + 'b:UTF-16LE') do |file|	
+	labels.keys.sort.each do |key|
+		str = key.first
+		xibs = labels[key]		
+		file.puts "\n/* #{xibs.join(', ')} */"				
+		file.puts '"'.encode('UTF-16LE') + str + '" = "'.encode('UTF-16LE') + str + '";'.encode('UTF-16LE')
+	end
+end
+	
+# Remove duplicates by order	
+remove_duplicates(File.join(output_path, 'Localizable.strings'))
+
+puts "\n\n* DONE *\nAGi18n finished internazionalizing correctly.\nRemember to use the Localizable.strings files as UTF-16LE into your XCode project"

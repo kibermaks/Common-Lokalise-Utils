@@ -1,0 +1,24 @@
+#!/usr/bin/env python
+
+import argparse
+import json
+
+CONFIG_FILE = u"../lokalise_config.json"
+
+with open(CONFIG_FILE) as f:
+    data = json.load(f)
+    PLATFORM_TYPE = data['platform']
+    LOCALIZATION_FOLDER = data['localization_path']
+    PROJECT_NAME = data['project_name']
+    LOKALISE_TOKEN = data['lokalise_token']
+    LOKALISE_PROJECT_ID = data['lokalise_project_id']
+    LOKALISE_PROJECT_ID = data['lokalise_project_id']
+
+if PLATFORM_TYPE == "ios":
+    import lokalise_ios
+    lokalise_ios.localization_export(LOCALIZATION_FOLDER, LOKALISE_TOKEN, LOKALISE_PROJECT_ID)
+else:
+    import lokalise_android
+    lokalise_android.localization_export(LOCALIZATION_FOLDER, LOKALISE_TOKEN, LOKALISE_PROJECT_ID)
+
+print('Finished exporting localization from lokalise...')
